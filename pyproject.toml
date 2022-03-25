@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "missing"
-version = "0.2.0"
+version = "0.2.1"
 description = ""
 authors = ["PLM <plm@hardcoretech.co>"]
 
@@ -9,7 +9,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.8"
 
 [tool.poetry.dev-dependencies]
 
