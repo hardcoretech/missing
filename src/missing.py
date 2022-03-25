@@ -23,6 +23,7 @@ class Missing:
         return fail
 
     def _check_init_py_exists(self, path: str) -> bool:
+        '''check the __init__.py exists on the current path and parent path'''
         fail = False
         basedir = os.path.dirname(path)
 
@@ -38,16 +39,18 @@ class Missing:
             fail = True
             # create the __init__.py
             with open(init_py, 'w') as fd:
-                logger.info('create file: {}'.format(init_py))
+                logger.warning('create file: {}'.format(init_py))
 
         return fail
 
     def _find_for_unittest(self, basedir: Optional[str] = None) -> bool:
         '''the unittest find the test*.py only for the regular package'''
         fail = False
+        init_run = False
 
         if basedir is None:
             basedir = '.'
+            init_run = True
 
         for filename in os.listdir(basedir):
             path = os.path.normpath(f'{basedir}/{filename}')
@@ -62,13 +65,25 @@ class Missing:
                 if self._check_init_py_exists(path):
                     fail = True
 
+        if init_run and fail:
+            logger.warning('found missing __init__.py for unittest')
+
         return fail
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description='Find the missing but necessary files')
     parser.add_argument('-e', '--exclude', type=list, default=['.git'], help='exclude the file or folder')
+    parser.add_argument('-q', '--quite', action='store_true', default=False, help='disable all log')
     args = parser.parse_args()
+
+    if args.quite:
+        logger.setLevel(logging.ERROR)
+    else:
+        logger.setLevel(logging.INFO)
+        if not logger.hasHandlers():
+            handler = logging.StreamHandler()
+            logger.addHandler(handler)
 
     missing = Missing(args.exclude)
     return missing.run()
