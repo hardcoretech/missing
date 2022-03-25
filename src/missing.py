@@ -8,7 +8,7 @@ from typing import Optional
 logger = logging.getLogger('missing')
 
 class Missing:
-    RE_TEST_PY = re.compile(r'test.*?\.py')
+    RE_TEST_PY = re.compile(r'^test.*?\.py$')
 
     def __init__(self, exclude):
         if not (isinstance(exclude, list) or isinstance(exclude, tuple)):
