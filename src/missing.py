@@ -11,6 +11,12 @@ class Missing:
     RE_TEST_PY = re.compile(r'test.*?\.py')
 
     def __init__(self, exclude):
+        if not (isinstance(exclude, list) or isinstance(exclude, tuple)):
+            raise TypeError('exclude should be list or tuple')
+
+        # append .git to exclude folder
+        exclude = set(['.git', *exclude])
+
         # normalize a pathname by collapsing redundant separators
         self._exclude = [os.path.normpath(path) for path in exclude]
 
@@ -73,7 +79,7 @@ class Missing:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description='Find the missing but necessary files')
-    parser.add_argument('-e', '--exclude', type=list, default=['.git'], help='exclude the file or folder')
+    parser.add_argument('-e', '--exclude', nargs='*', help='exclude the file or folder')
     parser.add_argument('-q', '--quite', action='store_true', default=False, help='disable all log')
     args = parser.parse_args()
 
@@ -85,7 +91,7 @@ def main() -> int:
             handler = logging.StreamHandler()
             logger.addHandler(handler)
 
-    missing = Missing(args.exclude)
+    missing = Missing(args.exclude or [])
     return missing.run()
 
 if __name__ == '__main__':
