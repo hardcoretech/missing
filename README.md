@@ -4,7 +4,7 @@ The simple [pre-commit][0] hook to find the missing but necessary files.
 ## Example ##
 ```yaml
 - repo: https://github.com/hardcoretech/missing
-  rev: v0.1.0
+  rev: v0.2.0
   hooks:
     - id: missing-init-py
 ```
