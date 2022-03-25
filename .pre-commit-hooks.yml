@@ -1,0 +1,8 @@
+- id: missing-init-py
+  name: find missing __init__.py
+  description: find the missing but necessary __init__.py
+  language: python
+  language_version: python3
+  pass_filenames: false
+  always_run: true
+  entry: missing

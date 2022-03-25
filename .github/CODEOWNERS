@@ -1,0 +1,5 @@
+# order is important
+# the last matching pattern takes the most precedence.
+
+# global owners
+*                           @hardcoretech/plm

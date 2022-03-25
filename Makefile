@@ -12,6 +12,7 @@ test:			# run test
 run:			# run in the local environment
 
 build:			# build the binary/library
+	poetry build
 
 upgrade:		# upgrade all the necessary packages
 	pre-commit autoupdate
