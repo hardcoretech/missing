@@ -3,16 +3,22 @@ import argparse
 import logging
 import os
 import re
+import subprocess
+from functools import lru_cache
 from typing import Optional
 
 logger = logging.getLogger('missing')
 
+
 class Missing:
     RE_TEST_PY = re.compile(r'^test.*?\.py$')
 
-    def __init__(self, exclude):
+    def __init__(self, mode, exclude):
         if not (isinstance(exclude, list) or isinstance(exclude, tuple)):
             raise TypeError('exclude should be list or tuple')
+
+        self._tracked_files = self._find_tracked_files(mode)
+        logger.debug('Tracked files: %r', self._tracked_files)
 
         # append .git to exclude folder
         exclude = set(['.git', *exclude])
@@ -28,8 +34,9 @@ class Missing:
 
         return fail
 
+    @lru_cache(maxsize=None)
     def _check_init_py_exists(self, path: str) -> bool:
-        '''check the __init__.py exists on the current path and parent path'''
+        """check the __init__.py exists on the current path and parent path"""
         fail = False
         basedir = os.path.dirname(path)
 
@@ -43,14 +50,14 @@ class Missing:
         init_py = f'{basedir}/__init__.py'
         if not os.path.exists(init_py):
             fail = True
+
             # create the __init__.py
             with open(init_py, 'w') as fd:
                 logger.warning('create file: {}'.format(init_py))
-
         return fail
 
     def _find_for_unittest(self, basedir: Optional[str] = None) -> bool:
-        '''the unittest find the test*.py only for the regular package'''
+        """the unittest find the test*.py only for the regular package"""
         fail = False
         init_run = False
 
@@ -62,25 +69,102 @@ class Missing:
             path = os.path.normpath(f'{basedir}/{filename}')
             if path in self._exclude:
                 # skip the explicitly excluded path
+                logger.debug('exclude: %r', path)
                 continue
 
             if os.path.isdir(path):
                 if self._find_for_unittest(path):
                     fail = True
             elif self.RE_TEST_PY.match(filename):
-                if self._check_init_py_exists(path):
-                    fail = True
+                if self._is_tracked(path):
+                    logger.debug('check: %r', path)
+                    if self._check_init_py_exists(path):
+                        fail = True
+                else:
+                    logger.debug('untracked: %r', path)
+            else:
+                logger.debug('no_match: %r', path)
 
         if init_run and fail:
             logger.warning('found missing __init__.py for unittest')
 
         return fail
 
+    def _is_tracked(self, path):
+        if self._tracked_files is None:
+            return True
+        return path in self._tracked_files
+
+    def _find_tracked_files(self, mode):
+        if mode == 'obey_gitignore':
+            return self._list_files_obey_gitignore()
+        elif mode == 'staged_only':
+            return self._list_files_staged_only()
+        else:
+            return None
+
+    def _list_files_staged_only(self):
+        # list staged files
+        tracked_files = (
+            subprocess.check_output(
+                ['git', '--no-pager', 'diff', '--name-only', '--cached', '-z'],
+                encoding='utf-8',
+            )
+            .rstrip('\0')
+            .split('\0')
+        )
+        return set(
+            [
+                os.path.normpath(tracked_file)
+                for tracked_file in tracked_files
+                if self.RE_TEST_PY.match(os.path.basename(tracked_file))
+            ]
+        )
+
+    def _list_files_obey_gitignore(self):
+        # list committed files
+        tracked_files = (
+            subprocess.check_output(
+                ['git', 'ls-files', '-z'],
+                encoding='utf-8',
+            )
+            .rstrip('\0')
+            .split('\0')
+        )
+
+        # list untracked files
+        tracked_files += (
+            subprocess.check_output(
+                ['git', 'ls-files', '-o', '--exclude-standard', '-z'],
+                encoding='utf-8',
+            )
+            .rstrip('\0')
+            .split('\0')
+        )
+        return set(
+            [
+                os.path.normpath(tracked_file)
+                for tracked_file in tracked_files
+                if self.RE_TEST_PY.match(os.path.basename(tracked_file))
+            ]
+        )
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description='Find the missing but necessary files')
     parser.add_argument('-e', '--exclude', nargs='*', help='exclude the file or folder')
-    parser.add_argument('-q', '--quite', action='store_true', default=False, help='disable all log')
+    parser.add_argument(
+        '-q', '--quite', action='store_true', default=False, help='disable all log'
+    )
+
+    parser.add_argument(
+        '-m',
+        '--mode',
+        type=str,
+        default='all',
+        choices=['all', 'obey_gitignore', 'staged_only'],
+        help='Search scope',
+    )
     args = parser.parse_args()
 
     if args.quite:
@@ -91,8 +175,9 @@ def main() -> int:
             handler = logging.StreamHandler()
             logger.addHandler(handler)
 
-    missing = Missing(args.exclude or [])
+    missing = Missing(args.mode, args.exclude or [])
     return missing.run()
+
 
 if __name__ == '__main__':
     exit(main())
