@@ -3,7 +3,7 @@ import tempfile
 
 import pytest
 
-from missing import Missing
+from missing import Missing, Mode
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ class TestMissing:
         assert os.path.isfile('tests/untracked/__init__.py')
         assert os.path.isfile('tests/staged/__init__.py')
         assert os.path.isfile('tests/__init__.py')
-        assert 0 == Missing(mode='all', exclude=[]).run()
+        assert 0 == Missing(mode=Mode.ALL, exclude=[]).run()
 
     def test__obey_gitignore(self, temp_git_folder):
         assert 1 == Missing(mode='obey_gitignore', exclude=[]).run()
@@ -54,7 +54,7 @@ class TestMissing:
         assert os.path.isfile('tests/untracked/__init__.py')
         assert os.path.isfile('tests/staged/__init__.py')
         assert os.path.isfile('tests/__init__.py')
-        assert 0 == Missing(mode='obey_gitignore', exclude=[]).run()
+        assert 0 == Missing(mode=Mode.OBEY_GITIGNORE, exclude=[]).run()
 
     def test__staged_only(self, temp_git_folder):
         assert 1 == Missing(mode='staged_only', exclude=[]).run()
@@ -63,7 +63,7 @@ class TestMissing:
         assert not os.path.exists('tests/untracked/__init__.py')
         assert os.path.isfile('tests/staged/__init__.py')
         assert os.path.isfile('tests/__init__.py')
-        assert 0 == Missing(mode='staged_only', exclude=[]).run()
+        assert 0 == Missing(mode=Mode.STAGED_ONLY, exclude=[]).run()
 
     def test__exclude(self, temp_git_folder):
-        assert 0 == Missing(mode='all', exclude=['tests']).run()
+        assert 0 == Missing(mode=Mode.ALL, exclude=['tests']).run()

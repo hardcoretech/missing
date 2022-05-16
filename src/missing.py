@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 import argparse
+import enum
 import logging
 import os
 import re
@@ -9,6 +10,13 @@ from typing import Optional
 
 logger = logging.getLogger('missing')
 
+class Mode(enum.Enum):
+    ALL = 'all'
+    OBEY_GITIGNORE = 'obey_gitignore'
+    STAGED_ONLY = 'staged_only'
+
+    def __str__(self):
+        return self.value
 
 class Missing:
     RE_TEST_PY = re.compile(r'^test.*?\.py$')
@@ -96,9 +104,9 @@ class Missing:
         return path in self._tracked_files
 
     def _find_tracked_files(self, mode):
-        if mode == 'obey_gitignore':
+        if Mode(mode) == Mode.OBEY_GITIGNORE:
             return self._list_files_obey_gitignore()
-        elif mode == 'staged_only':
+        elif Mode(mode) == Mode.STAGED_ONLY:
             return self._list_files_staged_only()
         else:
             return None
@@ -157,13 +165,13 @@ def main() -> int:
         '-q', '--quite', action='store_true', default=False, help='disable all log'
     )
 
+
     parser.add_argument(
         '-m',
         '--mode',
-        type=str,
-        default='all',
-        choices=['all', 'obey_gitignore', 'staged_only'],
-        help='Search scope',
+        type=Mode,
+        default=Mode.ALL,
+        choices=list(Mode)
     )
     args = parser.parse_args()
 
