@@ -1,0 +1,25 @@
+name: Run Unit Test
+
+on: [pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.6.8"
+      - name: Install dependencies
+        run: |
+          pip install pip --upgrade
+          pip install pytest
+      - name: Test with pytest
+        run: |
+          PYTHONPATH=src pytest --log-level=debug --junitxml=junit_report.xml .
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action/composite@v1
+        if: always()
+        with:
+          files: junit_report.xml
