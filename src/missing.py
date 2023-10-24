@@ -10,25 +10,26 @@ logger = logging.getLogger('missing')
 
 
 class Missing:
-
     def __init__(self, exclude: Sequence[str]):
         if not (isinstance(exclude, list) or isinstance(exclude, tuple)):
             raise TypeError('exclude should be list or tuple')
         for path in exclude:
             if os.path.exists(path) and not os.path.isdir(path):
-                raise TypeError(f"exclude should only contain directories, found file {path}")
+                raise TypeError(
+                    f'exclude should only contain directories, found file {path}'
+                )
 
         files = [os.path.normpath(path) for path in self._list_files()]
-        logger.debug(f"{files=}")
+        logger.debug(f'{files=}')
 
         exclude = [os.path.normpath(path) for path in exclude]
-        logger.debug(f"{exclude=}")
+        logger.debug(f'{exclude=}')
 
         files_included = set()
         for file in files:
             if all([not file.startswith(e) for e in exclude]):
                 files_included.add(file)
-        logger.debug(f"{files_included=}")
+        logger.debug(f'{files_included=}')
 
         self.files = files_included
 
@@ -55,10 +56,14 @@ class Missing:
     def _list_files():
         pattern = re.compile(r'^.*?\.py$')
 
-        files = subprocess.check_output(
-            ['git', 'ls-files', '-z'],
-            encoding='utf-8',
-        ).rstrip('\0').split('\0')
+        files = (
+            subprocess.check_output(
+                ['git', 'ls-files', '-z'],
+                encoding='utf-8',
+            )
+            .rstrip('\0')
+            .split('\0')
+        )
 
         files += (
             subprocess.check_output(
