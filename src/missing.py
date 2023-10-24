@@ -1,6 +1,5 @@
 #! /usr/bin/env python
 import argparse
-import enum
 import logging
 import os
 import re
@@ -11,23 +10,14 @@ from typing import Optional
 logger = logging.getLogger('missing')
 
 
-class Mode(enum.Enum):
-    ALL = 'all'
-    OBEY_GITIGNORE = 'obey_gitignore'
-    STAGED_ONLY = 'staged_only'
-
-    def __str__(self):
-        return self.value
-
-
 class Missing:
     RE_TEST_PY = re.compile(r'^.*?\.py$')
 
-    def __init__(self, mode, exclude):
+    def __init__(self, exclude):
         if not (isinstance(exclude, list) or isinstance(exclude, tuple)):
             raise TypeError('exclude should be list or tuple')
 
-        self._tracked_files = self._find_tracked_files(mode)
+        self._tracked_files = self._list_files_obey_gitignore()
         logger.debug('Tracked files: %r', self._tracked_files)
 
         # append .git to exclude folder
@@ -99,32 +89,6 @@ class Missing:
             return True
         return path in self._tracked_files
 
-    def _find_tracked_files(self, mode):
-        if Mode(mode) == Mode.OBEY_GITIGNORE:
-            return self._list_files_obey_gitignore()
-        elif Mode(mode) == Mode.STAGED_ONLY:
-            return self._list_files_staged_only()
-        else:
-            return None
-
-    def _list_files_staged_only(self):
-        # list staged files
-        tracked_files = (
-            subprocess.check_output(
-                ['git', '--no-pager', 'diff', '--name-only', '--cached', '-z'],
-                encoding='utf-8',
-            )
-            .rstrip('\0')
-            .split('\0')
-        )
-        return set(
-            [
-                os.path.normpath(tracked_file)
-                for tracked_file in tracked_files
-                if self.RE_TEST_PY.match(os.path.basename(tracked_file))
-            ]
-        )
-
     def _list_files_obey_gitignore(self):
         # list committed files
         tracked_files = (
@@ -161,13 +125,6 @@ def main() -> int:
         '-q', '--quite', action='store_true', default=False, help='disable all log'
     )
 
-    parser.add_argument(
-        '-m',
-        '--mode',
-        type=Mode,
-        default=Mode.ALL,
-        choices=list(Mode)
-    )
     args = parser.parse_args()
 
     if args.quite:
@@ -178,7 +135,7 @@ def main() -> int:
             handler = logging.StreamHandler()
             logger.addHandler(handler)
 
-    missing = Missing(args.mode, args.exclude or [])
+    missing = Missing(args.exclude or [])
     return missing.run()
 
 
