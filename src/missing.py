@@ -1,137 +1,62 @@
 #! /usr/bin/env python
 import argparse
-import enum
 import logging
 import os
 import re
 import subprocess
-from functools import lru_cache
-from typing import Optional
+from typing import Sequence
 
 logger = logging.getLogger('missing')
 
-class Mode(enum.Enum):
-    ALL = 'all'
-    OBEY_GITIGNORE = 'obey_gitignore'
-    STAGED_ONLY = 'staged_only'
-
-    def __str__(self):
-        return self.value
 
 class Missing:
-    RE_TEST_PY = re.compile(r'^test.*?\.py$')
-
-    def __init__(self, mode, exclude):
+    def __init__(self, exclude: Sequence[str]):
         if not (isinstance(exclude, list) or isinstance(exclude, tuple)):
             raise TypeError('exclude should be list or tuple')
+        for path in exclude:
+            if os.path.exists(path) and not os.path.isdir(path):
+                raise TypeError(
+                    f'exclude should only contain directories, found file {path}'
+                )
 
-        self._tracked_files = self._find_tracked_files(mode)
-        logger.debug('Tracked files: %r', self._tracked_files)
+        files = [os.path.normpath(path) for path in self._list_files()]
+        logger.debug(f'{files=}')
 
-        # append .git to exclude folder
-        exclude = set(['.git', *exclude])
+        exclude = [os.path.normpath(path) for path in exclude]
+        logger.debug(f'{exclude=}')
 
-        # normalize a pathname by collapsing redundant separators
-        self._exclude = [os.path.normpath(path) for path in exclude]
+        files_included = set()
+        for file in files:
+            if all([not file.startswith(e) for e in exclude]):
+                files_included.add(file)
+        logger.debug(f'{files_included=}')
+
+        self.files = files_included
 
     def run(self) -> int:
-        fail = 0
+        """Return 1 if there are missing files, otherwise 0"""
+        is_failed = 0
 
-        if self._find_for_unittest():
-            fail = 1
+        for file in self.files:
+            basedir = os.path.dirname(file)
 
-        return fail
-
-    @lru_cache(maxsize=None)
-    def _check_init_py_exists(self, path: str) -> bool:
-        """check the __init__.py exists on the current path and parent path"""
-        fail = False
-        basedir = os.path.dirname(path)
-
-        if basedir in ('', '.'):
-            return False
-
-        # check the parent folder
-        fail = self._check_init_py_exists(basedir)
-
-        # check the current __init__ exists or not
-        init_py = f'{basedir}/__init__.py'
-        if not os.path.exists(init_py):
-            fail = True
-
-            # create the __init__.py
-            with open(init_py, 'w') as fd:
-                logger.warning('create file: {}'.format(init_py))
-        return fail
-
-    def _find_for_unittest(self, basedir: Optional[str] = None) -> bool:
-        """the unittest find the test*.py only for the regular package"""
-        fail = False
-        init_run = False
-
-        if basedir is None:
-            basedir = '.'
-            init_run = True
-
-        for filename in os.listdir(basedir):
-            path = os.path.normpath(f'{basedir}/{filename}')
-            if path in self._exclude:
-                # skip the explicitly excluded path
-                logger.debug('exclude: %r', path)
+            if basedir in ('', '.'):
                 continue
 
-            if os.path.isdir(path):
-                if self._find_for_unittest(path):
-                    fail = True
-            elif self.RE_TEST_PY.match(filename):
-                if self._is_tracked(path):
-                    logger.debug('check: %r', path)
-                    if self._check_init_py_exists(path):
-                        fail = True
-                else:
-                    logger.debug('untracked: %r', path)
-            else:
-                logger.debug('no_match: %r', path)
+            init_py = os.path.join(basedir, '__init__.py')
+            if not os.path.exists(init_py):
+                is_failed = True
+                # create the __init__.py
+                with open(init_py, 'w'):
+                    logger.warning(f'create file: {init_py}')
 
-        if init_run and fail:
-            logger.warning('found missing __init__.py for unittest')
+        return is_failed
 
-        return fail
+    @staticmethod
+    def _list_files():
+        pattern = re.compile(r'^.*?\.py$')
 
-    def _is_tracked(self, path):
-        if self._tracked_files is None:
-            return True
-        return path in self._tracked_files
-
-    def _find_tracked_files(self, mode):
-        if Mode(mode) == Mode.OBEY_GITIGNORE:
-            return self._list_files_obey_gitignore()
-        elif Mode(mode) == Mode.STAGED_ONLY:
-            return self._list_files_staged_only()
-        else:
-            return None
-
-    def _list_files_staged_only(self):
-        # list staged files
-        tracked_files = (
-            subprocess.check_output(
-                ['git', '--no-pager', 'diff', '--name-only', '--cached', '-z'],
-                encoding='utf-8',
-            )
-            .rstrip('\0')
-            .split('\0')
-        )
-        return set(
-            [
-                os.path.normpath(tracked_file)
-                for tracked_file in tracked_files
-                if self.RE_TEST_PY.match(os.path.basename(tracked_file))
-            ]
-        )
-
-    def _list_files_obey_gitignore(self):
-        # list committed files
-        tracked_files = (
+        files = (
             subprocess.check_output(
                 ['git', 'ls-files', '-z'],
                 encoding='utf-8',
@@ -140,8 +65,7 @@ class Missing:
             .split('\0')
         )
 
-        # list untracked files
-        tracked_files += (
+        files += (
             subprocess.check_output(
                 ['git', 'ls-files', '-o', '--exclude-standard', '-z'],
                 encoding='utf-8',
@@ -149,12 +73,11 @@ class Missing:
             .rstrip('\0')
             .split('\0')
         )
+
         return set(
-            [
-                os.path.normpath(tracked_file)
-                for tracked_file in tracked_files
-                if self.RE_TEST_PY.match(os.path.basename(tracked_file))
-            ]
+            os.path.normpath(file)
+            for file in files
+            if pattern.match(os.path.basename(file))
         )
 
 
@@ -165,14 +88,6 @@ def main() -> int:
         '-q', '--quite', action='store_true', default=False, help='disable all log'
     )
 
-
-    parser.add_argument(
-        '-m',
-        '--mode',
-        type=Mode,
-        default=Mode.ALL,
-        choices=list(Mode)
-    )
     args = parser.parse_args()
 
     if args.quite:
@@ -183,7 +98,7 @@ def main() -> int:
             handler = logging.StreamHandler()
             logger.addHandler(handler)
 
-    missing = Missing(args.mode, args.exclude or [])
+    missing = Missing(args.exclude or [])
     return missing.run()
 
 
