@@ -1,47 +1,23 @@
-# Missing #
+# Missing
 
-A simple [pre-commit][0] hook to find missing `__init__.py` that is required for unit test cases to be discovered.
+A simple [pre-commit][0] hook to find missing `__init__.py`. Will obey settings in `.gitignore`.
 
-## Example ##
+## Example
 
-Default setting, everything except `.git` will be scanned
+Default settings
 
 ```yaml
 - repo: https://github.com/hardcoretech/missing
-  rev: v0.2.5
+  rev: v0.3.0
   hooks:
     - id: missing-init-py
 ```
 
-Exclude according to .gitignore
+Exclude some folders
 
 ```yaml
 - repo: https://github.com/hardcoretech/missing
-  rev: v0.2.5
-  hooks:
-    - id: missing-init-py
-      args:
-        - --mode
-        - obey_gitignore
-```
-
-Only include git staged files
-
-```yaml
-- repo: https://github.com/hardcoretech/missing
-  rev: v0.2.5
-  hooks:
-    - id: missing-init-py
-      args:
-        - --mode
-        - staged_only
-```
-
-Exclude frontend and doc folder
-
-```yaml
-- repo: https://github.com/hardcoretech/missing
-  rev: v0.2.5
+  rev: v0.3.0
   hooks:
     - id: missing-init-py
       args:
