@@ -7,8 +7,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
-      - uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: '3.8'
       - name: Install dependencies
@@ -19,7 +19,7 @@ jobs:
         run: |
           PYTHONPATH=src pytest --log-level=debug --junitxml=junit_report.xml .
       - name: Publish Unit Test Results
-        uses: EnricoMi/publish-unit-test-result-action/composite@b9f6c61d965bcaa18acc02d6daf706373a448f02 # v1
+        uses: EnricoMi/publish-unit-test-result-action/composite@c950f6fb443cb5af20a377fd0dfaa78838901040 # v2
         if: always()
         with:
           files: junit_report.xml
