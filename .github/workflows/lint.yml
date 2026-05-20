@@ -11,7 +11,7 @@ jobs:
           fetch-depth: 1024
       - uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4
         with:
-          python-version: '3.8'
+          python-version: '3.9'
       - name: pre-commit
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha}}
